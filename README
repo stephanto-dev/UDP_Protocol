@@ -1,0 +1,1 @@
+O que o programa faz até agora é enviar uma sequência de números de tamanho aleatórios para o servidor, ele recebe, cria em uma string aleatória do mesmo tamanho da mensagem recebida, envia e depois o cliente pega essa mensagem e concatena com 'ACK' e envia pro servidor
