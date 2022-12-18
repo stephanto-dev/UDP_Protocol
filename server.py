@@ -2,7 +2,7 @@
 import socket
 import random
 import string
-import math
+from constants import *
 
 #Função que gerar uma string aleatória
 def randomString(chars = string.ascii_letters+string.digits ,stringLength=10):
@@ -11,10 +11,14 @@ def randomString(chars = string.ascii_letters+string.digits ,stringLength=10):
 if __name__ == "__main__":
     host = "127.0.0.1"
     port = 4455
+    buffer = []
+    addressBuffer = []
+    rwnd = bufferSize
 
     #AF_INET = indica que é um protocolo de endereço ip
     #SOCK_DGRAM = indica que é um protocolo da camada de transporte UDP
     server = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+
     server.bind((host, port))
 
     print("Servidor UDP iniciado")
@@ -29,20 +33,36 @@ if __name__ == "__main__":
         #Recebe a mensagem do cliente
         msg_bytes, address = server.recvfrom(1024)
 
-        #Converte a mensagem recebida
+          #Converte a mensagem recebida
         msg_received_str = msg_bytes.decode("utf-8")
-        msg_received_int = int(msg_received_str)
+      
+
+        #Adiciona no Buffer
+        buffer.append(msg_received_str)
+        addressBuffer.append(address)
+        rwnd = rwnd - 1
 
         #Verifica se a mensagem recebida existe
-        if msg_received_str !="":
-            integer_length = int(math.log10(msg_received_int))+1
-            print(f"Mensagem recebida do cliente: {msg_received_str} \n | Número recebido: {msg_received_int}")
+        msg_received_int = int(buffer[0])
+        
+
+        if buffer[0] !="":
+            integer_length = len(buffer[0])
+
+            print(f"Mensagem recebida do cliente: {buffer[0]} \n | Número recebido: {msg_received_int}")
 
             msg_to_answer = randomString(stringLength=integer_length)
 
+            msg_to_send = msg_to_answer + " Janela de recepção: " + str(rwnd)
+            
+
             #Envia a mensagem para o cliente
-            server.sendto(msg_to_answer.encode("utf-8"), address)
+            server.sendto(msg_to_send.encode("utf-8"), addressBuffer[0])
             print(f"Mensagem enviada para o cliente: {msg_to_answer}")
+
+            buffer.pop(0)
+            addressBuffer.pop(0)
+            rwnd = rwnd + 1
 
             #Recebe a mensagem do cliente
             msg_bytes, address = server.recvfrom(1024)
