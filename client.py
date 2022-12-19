@@ -1,9 +1,7 @@
 #UDP Client
-import imp
 import socket
 import random
 import time
-from constants import *
 import sys
 import atexit
 
@@ -98,8 +96,6 @@ if __name__ == "__main__":
         client.sendto(msg_to_send.encode("utf-8"), addr)
 
         #Fecha a conexão e aguarda 10 segundos
-        client.close()
-        if msg_received_string.__contains__("Janela de recepção: 0"):
-            for i in range(3):
-                print(str(10-i) + "s")
-                time.sleep(1)
+        for i in range(10):
+            print(str(10-i) + "s")
+            time.sleep(1)
