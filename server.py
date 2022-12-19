@@ -61,7 +61,7 @@ def handleConnection(message_content, address):
     #Devolve mensagem de sucesso na conexão
     msg_to_answer = "connected"
     server.sendto(msg_to_answer.encode("utf-8"), address)
-    print(f"Conexao estabelecida com o cliente: {msg_to_answer}")
+    print(f"Conexao estabelecida com o cliente: {message_content}")
 
     #Ativa listen para a próxima mensagem
     listenMessages()
@@ -72,7 +72,7 @@ def handleDisconnection(message_content, address):
 
     msg_to_answer = "disconnected"
     server.sendto(msg_to_answer.encode("utf-8"), address)
-    print(f"Conexao estabelecida com o cliente: {msg_to_answer}")
+    print(f"Desconexão com o cliente: {message_content}")
 
 if __name__ == "__main__":
     host = "127.0.0.1"

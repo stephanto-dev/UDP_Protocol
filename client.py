@@ -3,6 +3,7 @@ import socket
 import random
 import time
 import sys
+import atexit
 
 client = None
 addr = None
@@ -18,6 +19,14 @@ def connectWithServer(client_id):
 
     client.sendto(message.encode("utf-8"), addr)
     print(f"Mensagem enviada para o servidor: {message}")
+
+def exit_handler():
+    message = "disconnect-" + str(client_id)
+
+    client.sendto(message.encode("utf-8"), addr)
+    print(f"Mensagem enviada para o servidor: {message}")
+
+atexit.register(exit_handler)
 
 if __name__ == "__main__":
     host = "127.0.0.1"
