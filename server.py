@@ -66,6 +66,9 @@ def handleConnection(message_content, address):
     #Ativa listen para a próxima mensagem
     listenMessages()
 
+def handleDisconnection(message_content, address):
+    connections.remove(message_content)
+
 if __name__ == "__main__":
     host = "127.0.0.1"
     port = 4455
@@ -97,5 +100,9 @@ if __name__ == "__main__":
         #Verifica tipo da mensagem para tratativa adequada
         if message_type == "connect":
           handleConnection(message_content, address)
-        else:
+        elif message_type == "disconnect":
+          handleDisconnection(message_content, address)
+        elif message_type == "message":
             handleMessage(message_content, address)
+        else:
+            print("Tipo de mensagem não suportado.")
