@@ -66,8 +66,13 @@ def handleConnection(message_content, address):
     #Ativa listen para a próxima mensagem
     listenMessages()
 
+#Função que remove conexões de cliente
 def handleDisconnection(message_content, address):
     connections.remove(message_content)
+
+    msg_to_answer = "disconnected"
+    server.sendto(msg_to_answer.encode("utf-8"), address)
+    print(f"Conexao estabelecida com o cliente: {msg_to_answer}")
 
 if __name__ == "__main__":
     host = "127.0.0.1"
