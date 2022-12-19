@@ -20,13 +20,15 @@ def connectWithServer(client_id):
     client.sendto(message.encode("utf-8"), addr)
     print(f"Mensagem enviada para o servidor: {message}")
 
-def exit_handler():
+#Função executada antes do programa ser finalizado
+def exitHandler():
     message = "disconnect-" + str(client_id)
 
     client.sendto(message.encode("utf-8"), addr)
     print(f"Mensagem enviada para o servidor: {message}")
 
-atexit.register(exit_handler)
+#Registro da função executada antes do programa ser finalizado
+atexit.register(exitHandler)
 
 if __name__ == "__main__":
     host = "127.0.0.1"
