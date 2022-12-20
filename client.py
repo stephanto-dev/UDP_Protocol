@@ -100,6 +100,7 @@ if __name__ == "__main__":
         client.sendto(msg_to_send.encode("utf-8"), addr)
 
         #Fecha a conexão e aguarda 10 segundos
+        
         if(msg_received_string.__contains__("Janela de Recepção: 0")):
             for i in range(10):
                 print(str(10-i) + "s")
@@ -108,3 +109,4 @@ if __name__ == "__main__":
             for i in range(3):
                 print(str(10-i) + "s")
                 time.sleep(1)
+

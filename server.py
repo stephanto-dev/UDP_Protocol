@@ -98,6 +98,7 @@ def handleConnection(message_content, address):
 #Função que remove conexões de cliente
 def handleDisconnection(message_content, address):
     global rwnd
+
     if message_content in connections:
         connections.remove(message_content)
 
