@@ -4,7 +4,7 @@ import random
 import string
 import math
 
-LIMIT = 1
+LIMIT = 2
 connections = []
 server = None
 
@@ -68,7 +68,8 @@ def handleConnection(message_content, address):
 
 #Função que remove conexões de cliente
 def handleDisconnection(message_content, address):
-    connections.remove(message_content)
+    if message_content in connections:
+        connections.remove(message_content)
 
     msg_to_answer = "disconnected"
     server.sendto(msg_to_answer.encode("utf-8"), address)
@@ -104,9 +105,9 @@ if __name__ == "__main__":
 
         #Verifica tipo da mensagem para tratativa adequada
         if message_type == "connect":
-          handleConnection(message_content, address)
+            handleConnection(message_content, address)
         elif message_type == "disconnect":
-          handleDisconnection(message_content, address)
+            handleDisconnection(message_content, address)
         elif message_type == "message":
             handleMessage(message_content, address)
         else:
