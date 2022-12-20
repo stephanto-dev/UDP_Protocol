@@ -36,15 +36,6 @@ def bufferDrop():
 def randomString(chars = string.ascii_letters+string.digits ,stringLength=10):
     return ''.join(random.choice(chars) for _ in range(stringLength))
 
-#Função que abre canal para ouvir próxima mensagem do cliente
-def listenMessages():
-    msg_received_str, address = receivePacket()
-    msg_received_str = msg_received_str.split("-")
-
-    bufferAdd(msg_received_str, address)
-
-    handleMessage(buffer[0], address)
-
 #Função para adicionar um cabeçalho IP e enviar o pacote para o roteador
 def sendPacket(address, message):
     #Adiciona o cabeçalho IP no pacote
@@ -71,6 +62,15 @@ def receivePacket():
 
     # Retorna o conteúdo da mensagem e o endereço de origem
     return message[2], address
+
+#Função que abre canal para ouvir próxima mensagem do cliente
+def listenMessages():
+    msg_received_str, address = receivePacket()
+    msg_received_str = msg_received_str.split("-")
+
+    bufferAdd(msg_received_str, address)
+
+    handleMessage(buffer[0], address)
 
 #Função que interpreta e responde mensagem do cliente
 def handleMessage(msg_received_str, address):
