@@ -14,11 +14,41 @@ def generateRandomNumber(begin_number, number_of_decimals):
     random_int = random.randrange(begin_number, ((10**number_of_decimals) -1))
     return random_int
 
+#Função para adicionar um cabeçalho IP e enviar o pacote para o roteador
+def sendPacket(address, message):
+    #Obtém endereço da instância
+    source_ip = client.getsockname()
+    source_ip = source_ip[0] + ":" + str(source_ip[1])
+
+    #Adiciona o cabeçalho IP no pacote
+    destination_ip = address[0] + ":" + str(address[1])
+    IP_header = source_ip + "|" + destination_ip
+    packet = IP_header + "|" + message
+
+    #Envia o pacote para o roteador
+    router = ("127.0.0.1", 8100)
+    client.sendto(packet.encode("utf-8"), router)
+
+#Função que decodifica o pacote do roteador
+def receivePacket():
+    #Recebe a mensagem do cliente
+    packet, _ = client.recvfrom(1024)
+
+    #Converte a mensagem recebida
+    message = packet.decode("utf-8").split("|")
+    
+    # Obtém o endereço de origem
+    ip_source = message[0].split(":")
+    address = (ip_source[0], ip_source[1])
+
+    # Retorna o conteúdo da mensagem e o endereço de origem
+    return message[2], address
+
 #Função que envia solicitação de conexão para o servidor
 def connectWithServer(client_id):
     message = "connect-" + str(client_id)
 
-    client.sendto(message.encode("utf-8"), addr)
+    sendPacket(addr, message)
     print(f"Mensagem enviada para o servidor: {message}")
 
 #Função executada antes do programa ser finalizado
@@ -27,7 +57,7 @@ def exitHandler():
 
     message = "disconnect-" + str(client_id)
 
-    client.sendto(message.encode("utf-8"), addr)
+    sendPacket(addr, message)
     print(f"Mensagem enviada para o servidor: {message}")
 
 #Registro da função executada antes do programa ser finalizado
@@ -42,6 +72,9 @@ if __name__ == "__main__":
     #SOCK_DGRAM = indica que é um protocolo da camada de transporte UDP
     client = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 
+    #Vincula uma porta ao cliente
+    client.bind(("127.0.0.1", 0))
+
     #Gera identificador do cliente
     client_id = generateRandomNumber(
         begin_number = 1,
@@ -52,10 +85,7 @@ if __name__ == "__main__":
     connectWithServer(client_id)
 
     #Recebe a mensagem do servidor
-    msg_bytes, address = client.recvfrom(1024)
-
-    #Converte a mensagem recebida
-    msg_received_string = msg_bytes.decode("utf-8")
+    msg_received_string, address = receivePacket()
 
     # Verifica resposta de conexão enviada pelo servidor
     if msg_received_string == "connected":
@@ -83,13 +113,11 @@ if __name__ == "__main__":
         print(f"Mensagem enviada para o servidor: {msg_to_send}")
 
         #Envia a mensagem para o servidor
-        client.sendto(msg_to_send.encode("utf-8"), addr)
+        sendPacket(addr, msg_to_send)
 
         #Recebe a mensagem do servidor
-        msg_bytes, address = client.recvfrom(1024)
+        msg_received_string, address = receivePacket()
 
-        #Converte a mensagem recebida
-        msg_received_string = msg_bytes.decode("utf-8")
         print(f"Mensagem recebida do servidor: {msg_received_string}")
 
         #Envia mensagem para o servidor com o tipo message
@@ -97,7 +125,7 @@ if __name__ == "__main__":
         print(f"Mensagem enviada para o servidor: {msg_to_send}")
 
         #Envia a mensagem para o servidor
-        client.sendto(msg_to_send.encode("utf-8"), addr)
+        sendPacket(addr, msg_to_send)
 
         #Fecha a conexão e aguarda 10 segundos
         

@@ -38,12 +38,39 @@ def randomString(chars = string.ascii_letters+string.digits ,stringLength=10):
 
 #Função que abre canal para ouvir próxima mensagem do cliente
 def listenMessages():
-    msg_bytes, address = server.recvfrom(1024)
-    msg_received_str = msg_bytes.decode("utf-8").split("-")
+    msg_received_str, address = receivePacket()
+    msg_received_str = msg_received_str.split("-")
 
     bufferAdd(msg_received_str, address)
 
     handleMessage(buffer[0], address)
+
+#Função para adicionar um cabeçalho IP e enviar o pacote para o roteador
+def sendPacket(address, message):
+    #Adiciona o cabeçalho IP no pacote
+    source_ip = "127.0.0.1:4455"
+    destination_ip = address[0] + ":" + str(address[1])
+    IP_header = source_ip + "|" + destination_ip
+    packet = IP_header + "|" + message
+
+    #Envia o pacote para o roteador
+    router = ("127.0.0.1", 8100)
+    server.sendto(packet.encode("utf-8"), router)
+
+#Função que decodifica o pacote do roteador
+def receivePacket():
+    #Recebe a mensagem do cliente
+    packet, _ = server.recvfrom(1024)
+
+    #Converte a mensagem recebida
+    message = packet.decode("utf-8").split("|")
+    
+    # Obtém o endereço de origem
+    ip_source = message[0].split(":")
+    address = (ip_source[0], ip_source[1])
+
+    # Retorna o conteúdo da mensagem e o endereço de origem
+    return message[2], address
 
 #Função que interpreta e responde mensagem do cliente
 def handleMessage(msg_received_str, address):
@@ -58,14 +85,11 @@ def handleMessage(msg_received_str, address):
         msg_to_send = msg_to_answer + " Janela de recepção: " + str(rwnd)
 
         #Envia a mensagem para o cliente
-        server.sendto(msg_to_send.encode("utf-8"), address)
+        sendPacket(address, msg_to_send)
         print(f"Mensagem enviada para o cliente: {msg_to_send}")
 
         #Recebe a mensagem do cliente
-        msg_bytes, address = server.recvfrom(1024)
-
-        #Converte a mensagem recebida
-        msg_received_str = msg_bytes.decode("utf-8")
+        msg_received_str, address = receivePacket()
 
         print(f"Mensagem recebida do cliente: {msg_received_str}")
         print("#"*15)
@@ -79,7 +103,7 @@ def handleConnection(message_content, address):
     #Devolve mensagem de falha na conexão, caso limite de sockets tenha sido atingido
     if len(connections) >= LIMIT:
       msg_to_answer = "failed"
-      server.sendto(msg_to_answer.encode("utf-8"), address)
+      sendPacket(address, msg_to_answer)
       print(f"Conexao recusada com o cliente: {message_content}, Janela de Recepção:{rwnd}")
 
       return
@@ -89,7 +113,7 @@ def handleConnection(message_content, address):
 
     #Devolve mensagem de sucesso na conexão
     msg_to_answer = "connected"
-    server.sendto(msg_to_answer.encode("utf-8"), address)
+    sendPacket(address, msg_to_answer)
     print(f"Conexao estabelecida com o cliente: {message_content}, Janela de Recepção:{rwnd}")
 
     #Ativa listen para a próxima mensagem
@@ -104,7 +128,7 @@ def handleDisconnection(message_content, address):
 
     msg_to_answer = "disconnected"
     msg_to_send = msg_to_answer + " Janela de recepção: " + str(rwnd)
-    server.sendto(msg_to_send.encode("utf-8"), address)
+    sendPacket(address, msg_to_send)
     print(f"Desconexão com o cliente: {message_content}")
 
     bufferDrop()
@@ -129,10 +153,8 @@ if __name__ == "__main__":
         print("Aguardando mensagem do cliente...")
 
         #Recebe a mensagem do cliente
-        msg_bytes, address = server.recvfrom(1024)
-
-        #Converte a mensagem recebida
-        message = msg_bytes.decode("utf-8").split("-")
+        message, address = receivePacket()
+        message = message.split("-")
 
         bufferAdd(message, address)
 
