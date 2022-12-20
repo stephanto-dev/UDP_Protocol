@@ -7,6 +7,7 @@ import atexit
 
 client = None
 addr = None
+connectedWithServer = False
 
 #Função que gerar um número aleatório
 def generateRandomNumber(begin_number, number_of_decimals):
@@ -22,6 +23,8 @@ def connectWithServer(client_id):
 
 #Função executada antes do programa ser finalizado
 def exitHandler():
+    if not connectedWithServer: return
+
     message = "disconnect-" + str(client_id)
 
     client.sendto(message.encode("utf-8"), addr)
@@ -57,6 +60,7 @@ if __name__ == "__main__":
     # Verifica resposta de conexão enviada pelo servidor
     if msg_received_string == "connected":
         print("Conexao estabelecida com o servidor")
+        connectedWithServer = True
     else:
         print("Conexao nao estabelecida com o servidor")
 
