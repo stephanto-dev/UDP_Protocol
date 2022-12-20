@@ -146,6 +146,6 @@ if __name__ == "__main__":
         elif message_type == "disconnect":
             handleDisconnection(message_content, address)
         elif message_type == "message":
-            handleMessage(message_content, address)
+            handleMessage(message, address)
         else:
             print("Tipo de mensagem não suportado.")
