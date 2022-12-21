@@ -72,6 +72,7 @@ def listenMessages():
 
     handleMessage(buffer[0], address)
 
+#Função que envia ACK de mensagem recebida para o cliente
 def sendAck(msg_received_str, address):
     msg_received_int = int(msg_received_str[1])
 

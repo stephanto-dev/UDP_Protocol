@@ -59,14 +59,15 @@ def receivePacket():
     message = packet.decode("utf-8").split("|")
     message_content = message[2]
 
+    #Trata recebimento de mensagens que não de conexão
     if not message.__contains__('connected'):
       splited_message = message[2].split("-")
 
       message_type = splited_message[0]
       message_content = splited_message[1]
 
+      #Verifica se mensagem não é um ACK para remover do buffer e aumentar cwnd
       if message_type == "ack":
-          message_content
           print(f"ACK da mensagem {message_content} recebido")
           buffer.remove(message_content)
           cwnd = cwnd + 1
