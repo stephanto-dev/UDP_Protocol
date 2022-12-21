@@ -72,27 +72,30 @@ def listenMessages():
 
     handleMessage(buffer[0], address)
 
-#Função que interpreta e responde mensagem do cliente
-def handleMessage(msg_received_str, address):
+def sendAck(msg_received_str, address):
     msg_received_int = int(msg_received_str[1])
 
     #Verifica se a mensagem recebida existe
     if msg_received_str !="":
-        integer_length = len(msg_received_str[1])
         print(f"Mensagem recebida do cliente: {msg_received_str[1]} \n | Número recebido: {msg_received_int}")
 
-        msg_to_answer = randomString(stringLength=integer_length)
+        #Envia ACK para o cliente
+        msg_to_answer = "ack-" + msg_received_str[1]
+        sendPacket(address, msg_to_answer)
+        print(f"Mensagem enviada para o cliente: {msg_to_answer}")
+
+#Função que interpreta e responde mensagem do cliente
+def handleMessage(msg_received_str, address):
+    #Verifica se a mensagem recebida existe
+    if msg_received_str !="":
+        integer_length = len(msg_received_str[1])
+
+        msg_to_answer = "message-" + randomString(stringLength=integer_length)
         msg_to_send = msg_to_answer + " Janela de recepção: " + str(rwnd)
 
         #Envia a mensagem para o cliente
         sendPacket(address, msg_to_send)
         print(f"Mensagem enviada para o cliente: {msg_to_send}")
-
-        #Recebe a mensagem do cliente
-        msg_received_str, address = receivePacket()
-
-        print(f"Mensagem recebida do cliente: {msg_received_str}")
-        print("#"*15)
 
 #Função que manipula solicitações de conexão do cliente
 def handleConnection(message_content, address):
@@ -168,6 +171,7 @@ if __name__ == "__main__":
         elif message_type == "disconnect":
             handleDisconnection(message_content, address)
         elif message_type == "message":
+            sendAck(message, address)
             handleMessage(message, address)
         else:
             print("Tipo de mensagem não suportado.")
