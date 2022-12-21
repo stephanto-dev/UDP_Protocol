@@ -12,6 +12,7 @@ connectedWithServer = False
 BUFFER_SIZE = 3
 cwnd = BUFFER_SIZE
 buffer = []
+queue = []
 
 #Função que gerar um número aleatório
 def generateRandomNumber(begin_number, number_of_decimals):
@@ -38,9 +39,10 @@ def sendPacket(address, message):
       return;
 
     #Salva mensagem no buffer e diminui cwnd
-    message_content = message.split("-")[1]
-    buffer.append(message_content)
-    cwnd = cwnd - 1
+    if not message.__contains__('connect'):
+      message_content = message.split("-")[1]
+      buffer.append(message_content)
+      cwnd = cwnd - 1
 
     #Envia o pacote para o roteador
     router = ("127.0.0.1", 8100)
