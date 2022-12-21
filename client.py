@@ -12,6 +12,7 @@ connectedWithServer = False
 BUFFER_SIZE = 3
 cwnd = BUFFER_SIZE
 buffer = []
+queue = []
 
 #Função que gerar um número aleatório
 def generateRandomNumber(begin_number, number_of_decimals):
@@ -22,6 +23,25 @@ def generateRandomNumber(begin_number, number_of_decimals):
 def sendPacket(address, message):
     global cwnd
 
+    if len(queue):
+      next_message = message
+      message = queue[0]
+
+      queue.remove(message)
+      queue.append(next_message)
+
+      print(f"Mensagem adicionada na fila: {next_message}")
+      print(f"Mensagens na fila: {queue}")
+
+    #Verifica janela de congestionamento
+    if not cwnd:
+      print(f"Não foi possível enviar mensagem para o servidor. Janela de congestionamento cheia")
+      print(f"Mensagens sem ACK: {buffer}")
+
+      queue.append(message)
+
+      return;
+
     #Obtém endereço da instância
     source_ip = client.getsockname()
     source_ip = source_ip[0] + ":" + str(source_ip[1])
@@ -31,16 +51,11 @@ def sendPacket(address, message):
     IP_header = source_ip + "|" + destination_ip
     packet = IP_header + "|" + message
 
-    #Verifica janela de congestionamento
-    if not cwnd:
-      print(f"Não foi possível enviar mensagem para o servidor. Janela de congestionamento cheia")
-      print(f"Mensagens sem ACK: {buffer}")
-      return;
-
     #Salva mensagem no buffer e diminui cwnd
-    message_content = message.split("-")[1]
-    buffer.append(message_content)
-    cwnd = cwnd - 1
+    if not message.__contains__('connect'):
+      message_content = message.split("-")[1]
+      buffer.append(message_content)
+      cwnd = cwnd - 1
 
     #Envia o pacote para o roteador
     router = ("127.0.0.1", 8100)
@@ -71,6 +86,11 @@ def receivePacket():
           print(f"ACK da mensagem {message_content} recebido")
           buffer.remove(message_content)
           cwnd = cwnd + 1
+
+          if len(queue):
+            next_message = queue[0]
+            queue.remove(next_message)
+            sendPacket(addr, next_message)
 
     # Obtém o endereço de origem
     ip_source = message[0].split(":")
