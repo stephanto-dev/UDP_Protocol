@@ -9,6 +9,10 @@ client = None
 addr = None
 connectedWithServer = False
 
+BUFFER_SIZE = 3
+cwnd = BUFFER_SIZE
+buffer = []
+
 #Função que gerar um número aleatório
 def generateRandomNumber(begin_number, number_of_decimals):
     random_int = random.randrange(begin_number, ((10**number_of_decimals) -1))
@@ -16,6 +20,8 @@ def generateRandomNumber(begin_number, number_of_decimals):
 
 #Função para adicionar um cabeçalho IP e enviar o pacote para o roteador
 def sendPacket(address, message):
+    global cwnd
+
     #Obtém endereço da instância
     source_ip = client.getsockname()
     source_ip = source_ip[0] + ":" + str(source_ip[1])
@@ -25,31 +31,59 @@ def sendPacket(address, message):
     IP_header = source_ip + "|" + destination_ip
     packet = IP_header + "|" + message
 
+    #Verifica janela de congestionamento
+    if not cwnd:
+      print(f"Não foi possível enviar mensagem para o servidor. Janela de congestionamento cheia")
+      print(f"Mensagens sem ACK: {buffer}")
+      return;
+
+    #Salva mensagem no buffer e diminui cwnd
+    message_content = message.split("-")[1]
+    buffer.append(message_content)
+    cwnd = cwnd - 1
+
     #Envia o pacote para o roteador
     router = ("127.0.0.1", 8100)
     client.sendto(packet.encode("utf-8"), router)
 
+    print(f"Mensagem enviada para o servidor: {message}")
+
 #Função que decodifica o pacote do roteador
 def receivePacket():
+    global cwnd
+
     #Recebe a mensagem do cliente
     packet, _ = client.recvfrom(1024)
 
     #Converte a mensagem recebida
     message = packet.decode("utf-8").split("|")
-    
+    message_content = message[2]
+
+    #Trata recebimento de mensagens que não de conexão
+    if not message.__contains__('connected'):
+      splited_message = message[2].split("-")
+
+      message_type = splited_message[0]
+      message_content = splited_message[1]
+
+      #Verifica se mensagem não é um ACK para remover do buffer e aumentar cwnd
+      if message_type == "ack":
+          print(f"ACK da mensagem {message_content} recebido")
+          buffer.remove(message_content)
+          cwnd = cwnd + 1
+
     # Obtém o endereço de origem
     ip_source = message[0].split(":")
     address = (ip_source[0], ip_source[1])
 
     # Retorna o conteúdo da mensagem e o endereço de origem
-    return message[2], address
+    return message_content, address
 
 #Função que envia solicitação de conexão para o servidor
 def connectWithServer(client_id):
     message = "connect-" + str(client_id)
 
     sendPacket(addr, message)
-    print(f"Mensagem enviada para o servidor: {message}")
 
 #Função executada antes do programa ser finalizado
 def exitHandler():
@@ -58,7 +92,6 @@ def exitHandler():
     message = "disconnect-" + str(client_id)
 
     sendPacket(addr, message)
-    print(f"Mensagem enviada para o servidor: {message}")
 
 #Registro da função executada antes do programa ser finalizado
 atexit.register(exitHandler)
@@ -110,7 +143,6 @@ if __name__ == "__main__":
 
         #Converte o número para string e envia com o tipo message
         msg_to_send = "message-" + str(random_int_to_send)
-        print(f"Mensagem enviada para o servidor: {msg_to_send}")
 
         #Envia a mensagem para o servidor
         sendPacket(addr, msg_to_send)
@@ -120,21 +152,13 @@ if __name__ == "__main__":
 
         print(f"Mensagem recebida do servidor: {msg_received_string}")
 
-        #Envia mensagem para o servidor com o tipo message
-        msg_to_send = "message-" + msg_received_string + " ACK"
-        print(f"Mensagem enviada para o servidor: {msg_to_send}")
-
-        #Envia a mensagem para o servidor
-        sendPacket(addr, msg_to_send)
-
-        #Fecha a conexão e aguarda 10 segundos
-        
+        #Aguarda período de tempo de acordo com a janela de recepção
         if(msg_received_string.__contains__("Janela de Recepção: 0")):
             for i in range(10):
                 print(str(10-i) + "s")
                 time.sleep(1)
         else:
             for i in range(3):
-                print(str(10-i) + "s")
+                print(str(3-i) + "s")
                 time.sleep(1)
 
