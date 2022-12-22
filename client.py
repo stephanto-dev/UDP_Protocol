@@ -221,7 +221,15 @@ if __name__ == "__main__":
 
         print(f"Mensagem recebida do servidor: {msg_received_string}")
 
-        #Aguarda período de tempo de acordo com a janela de recepção
+        #Envia mensagem para o servidor com o tipo message
+        msg_to_send = "message-" + msg_received_string + " ACK"
+        print(f"Mensagem enviada para o servidor: {msg_to_send}")
+
+        #Envia a mensagem para o servidor
+        client.sendto(msg_to_send.encode("utf-8"), addr)
+
+        #Fecha a conexão e aguarda 10 segundos
+        
         if(msg_received_string.__contains__("Janela de Recepção: 0")):
             for i in range(10):
                 print(str(10-i) + "s")
