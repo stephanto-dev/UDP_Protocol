@@ -2,6 +2,7 @@
 import socket
 import random
 import string
+import math
 
 LIMIT = 2
 BUFFER_SIZE = 3
@@ -10,8 +11,6 @@ server = None
 buffer = []
 addressBuffer = []
 rwnd = BUFFER_SIZE 
-order = 0
-orderBuffer = []
 
 #Função que adiciona mensagem ao buffer
 def bufferAdd(message, address):
@@ -73,33 +72,27 @@ def listenMessages():
 
     handleMessage(buffer[0], address)
 
-#Função que envia ACK de mensagem recebida para o cliente
-def sendAck(msg_received_str, address):
-
-    msg_order_split = msg_received_str[1].split("?")
-    msg_received_int = int(msg_order_split[0])
-
-    #Verifica se a mensagem recebida existe
-    if msg_received_str !="":
-        print(f"Mensagem recebida do cliente: {msg_received_str[1]} \n | Número recebido: {msg_received_int}")
-
-        #Envia ACK para o cliente
-        msg_to_answer = "ack-" + msg_received_str[1]
-        sendPacket(address, msg_to_answer)
-        print(f"Mensagem enviada para o cliente: {msg_to_answer}")
-
 #Função que interpreta e responde mensagem do cliente
 def handleMessage(msg_received_str, address):
+    msg_received_int = int(msg_received_str[1])
+
     #Verifica se a mensagem recebida existe
     if msg_received_str !="":
         integer_length = len(msg_received_str[1])
+        print(f"Mensagem recebida do cliente: {msg_received_str[1]} \n | Número recebido: {msg_received_int}")
 
-        msg_to_answer = "message-" + randomString(stringLength=integer_length)
+        msg_to_answer = randomString(stringLength=integer_length)
         msg_to_send = msg_to_answer + " Janela de recepção: " + str(rwnd)
 
         #Envia a mensagem para o cliente
         sendPacket(address, msg_to_send)
         print(f"Mensagem enviada para o cliente: {msg_to_send}")
+
+        #Recebe a mensagem do cliente
+        msg_received_str, address = receivePacket()
+
+        print(f"Mensagem recebida do cliente: {msg_received_str}")
+        print("#"*15)
 
 #Função que manipula solicitações de conexão do cliente
 def handleConnection(message_content, address):
@@ -162,25 +155,12 @@ if __name__ == "__main__":
         #Recebe a mensagem do cliente
         message, address = receivePacket()
         message = message.split("-")
-        
+
+        bufferAdd(message, address)
+
         #Extrai tipo e conteúdo da mensagem
         message_type = message[0]
         message_content = message[1]
-
-        if message_type == "message":
-            message_order = (message_content.split("?"))[1]
-            message_order = int(message_order)
-            print(f"MESSAGE ORDER: {message_order}")
-        
-        print(f"-----ORDER: {order}----")
-
-        if message_type == "message" and message_order != order:
-            sendAck(last_message, address)
-            order = int(last_message[1].split("?")[1]) + 1
-            continue
-
-
-        bufferAdd(message, address)
 
         #Verifica tipo da mensagem para tratativa adequada
         if message_type == "connect":
@@ -188,10 +168,6 @@ if __name__ == "__main__":
         elif message_type == "disconnect":
             handleDisconnection(message_content, address)
         elif message_type == "message":
-            sendAck(message, address)
             handleMessage(message, address)
         else:
             print("Tipo de mensagem não suportado.")
-        
-        last_message = message
-        order = order + 1
