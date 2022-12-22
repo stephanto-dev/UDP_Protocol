@@ -109,7 +109,6 @@ def receivePacket():
                 m = 0
 
                 #Envia metade das mensagens do buffer novamente
-                print("Reenviando mensagens...")
                 while m <= int(len(buffer)/2):
                     #Coleta a mensagem do buffer
                     temporary_message = "message-" + buffer[m]
