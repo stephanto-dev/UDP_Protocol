@@ -13,6 +13,8 @@ BUFFER_SIZE = 3
 cwnd = BUFFER_SIZE
 buffer = []
 queue = []
+order = 0
+duplicated_acks_count = ("", 0)
 
 #Função que gerar um número aleatório
 def generateRandomNumber(begin_number, number_of_decimals):
@@ -66,6 +68,9 @@ def sendPacket(address, message):
 #Função que decodifica o pacote do roteador
 def receivePacket():
     global cwnd
+    global duplicated_acks_count
+    global queue
+    global buffer
 
     #Recebe a mensagem do cliente
     packet, _ = client.recvfrom(1024)
@@ -84,8 +89,50 @@ def receivePacket():
       #Verifica se mensagem não é um ACK para remover do buffer e aumentar cwnd
       if message_type == "ack":
           print(f"ACK da mensagem {message_content} recebido")
-          buffer.remove(message_content)
+          #Verifica se tem ack duplicado
+          if message_content in buffer:
+            buffer.remove(message_content)
+          else:
+            duplicated_acks_count = (message_content, duplicated_acks_count[1] + 1)
+            if duplicated_acks_count[1] == 3:
+                duplicated_acks_count = ("", 0)
+                 #Obtém endereço da instância
+                source_ip = client.getsockname()
+                source_ip = source_ip[0] + ":" + str(source_ip[1])
+
+                #Adiciona o cabeçalho IP no pacote
+                destination_ip = addr[0] + ":" + str(addr[1])
+                IP_header = source_ip + "|" + destination_ip
+
+                #Sincronizando pacotes
+                client.recvfrom(1024)
+                m = 0
+
+                #Envia metade das mensagens do buffer novamente
+                while m <= int(len(buffer)/2):
+                    #Coleta a mensagem do buffer
+                    temporary_message = "message-" + buffer[m]
+                    packet = IP_header + "|" + temporary_message
+
+                    #Envia para o servidor
+                    router = ("127.0.0.1", 8100)
+                    client.sendto(packet.encode("utf-8"), router)
+
+                    #Ouve o próximo ACK
+                    packet, _ = client.recvfrom(1024)
+                    packet = (packet.decode("utf-8")).split("-")
+                    print(f"ACK da mensagem: {packet[1]} recebido")
+
+                    #Caso ela tenha sido enviada em ordem, é retirada do buffer
+                    if packet[1] == buffer[m]:
+                        buffer.remove(buffer[m])
+                        m -= 1
+                    time.sleep(3)
+                    m += 1
+
+
           cwnd = cwnd + 1
+
 
           if len(queue):
             next_message = queue[0]
@@ -162,10 +209,12 @@ if __name__ == "__main__":
         )
 
         #Converte o número para string e envia com o tipo message
-        msg_to_send = "message-" + str(random_int_to_send)
+        msg_to_send = "message-" + str(random_int_to_send) + "?" + str(order)
 
         #Envia a mensagem para o servidor
         sendPacket(addr, msg_to_send)
+
+        order = order + 1
 
         #Recebe a mensagem do servidor
         msg_received_string, address = receivePacket()
@@ -181,4 +230,3 @@ if __name__ == "__main__":
             for i in range(3):
                 print(str(3-i) + "s")
                 time.sleep(1)
-
