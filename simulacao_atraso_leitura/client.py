@@ -104,6 +104,8 @@ def receivePacket():
                 destination_ip = addr[0] + ":" + str(addr[1])
                 IP_header = source_ip + "|" + destination_ip
 
+                #Sincronizando pacotes
+                client.recvfrom(1024)
                 m = 0
 
                 #Envia metade das mensagens do buffer novamente
@@ -115,7 +117,6 @@ def receivePacket():
                     #Envia para o servidor
                     router = ("127.0.0.1", 8100)
                     client.sendto(packet.encode("utf-8"), router)
-                    print(f"Enviando pacote: {temporary_message}")
 
                     #Ouve o próximo ACK
                     packet, _ = client.recvfrom(1024)
