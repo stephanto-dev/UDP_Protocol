@@ -65,34 +65,25 @@ def sendPacket(address, message):
 
     print(f"Mensagem enviada para o servidor: {message}")
 
-#Função que decodifica o pacote do roteador
-def receivePacket():
-    global cwnd
+#Função para lidar com ACKs
+def handleACK(message):
     global duplicated_acks_count
+    global cwnd
     global queue
     global buffer
 
-    #Recebe a mensagem do cliente
-    packet, _ = client.recvfrom(1024)
+    splitted_message = message[2].split("-")
+    message_type = splitted_message[0]
+    message_content = splitted_message[1]
+    rwnd = splitted_message[2][4:]
 
-    #Converte a mensagem recebida
-    message = packet.decode("utf-8").split("|")
-    message_content = message[2]
-
-    #Trata recebimento de mensagens que não de conexão
-    if not message.__contains__('connected'):
-      splited_message = message[2].split("-")
-
-      message_type = splited_message[0]
-      message_content = splited_message[1]
-
-      #Verifica se mensagem não é um ACK para remover do buffer e aumentar cwnd
-      if message_type == "ack":
-          print(f"ACK da mensagem {message_content} recebido")
-          #Verifica se tem ack duplicado
-          if message_content in buffer:
+    #Verifica se mensagem não é um ACK para remover do buffer e aumentar cwnd
+    if message_type == "ack":
+        print(f"ACK da mensagem {message_content} recebido")
+        #Verifica se tem ack duplicado
+        if message_content in buffer:
             buffer.remove(message_content)
-          else:
+        else:
             duplicated_acks_count = (message_content, duplicated_acks_count[1] + 1)
             if duplicated_acks_count[1] == 3:
                 duplicated_acks_count = ("", 0)
@@ -131,13 +122,26 @@ def receivePacket():
                     m += 1
 
 
-          cwnd = cwnd + 1
+        cwnd = cwnd + 1
 
 
-          if len(queue):
+        if len(queue):
             next_message = queue[0]
             queue.remove(next_message)
             sendPacket(addr, next_message)
+
+#Função que decodifica o pacote do roteador
+def receivePacket():
+    #Recebe a mensagem do cliente
+    packet, _ = client.recvfrom(1024)
+
+    #Converte a mensagem recebida
+    message = packet.decode("utf-8").split("|")
+    message_content = message[2]
+
+    #Trata recebimento de mensagens que não de conexão
+    if message_content.find('connected') == -1:
+        handleACK(message)
 
     # Obtém o endereço de origem
     ip_source = message[0].split(":")
@@ -188,7 +192,7 @@ if __name__ == "__main__":
     msg_received_string, address = receivePacket()
 
     # Verifica resposta de conexão enviada pelo servidor
-    if msg_received_string == "connected":
+    if msg_received_string.find('connected') != -1:
         print("Conexao estabelecida com o servidor")
         connectedWithServer = True
     else:
@@ -222,7 +226,7 @@ if __name__ == "__main__":
         print(f"Mensagem recebida do servidor: {msg_received_string}")
 
         #Aguarda período de tempo de acordo com a janela de recepção
-        if(msg_received_string.__contains__("Janela de Recepção: 0")):
+        if msg_received_string.find("-rwnd0") != -1:
             for i in range(10):
                 print(str(10-i) + "s")
                 time.sleep(1)
