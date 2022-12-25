@@ -4,46 +4,53 @@ import random
 import time
 import sys
 import atexit
+from threading import Timer, Thread
+from aimd import Aimd
 
 client = None
 addr = None
 connectedWithServer = False
 
 BUFFER_SIZE = 3
-cwnd = BUFFER_SIZE
 buffer = []
-queue = []
 order = 0
 duplicated_acks_count = ("", 0)
+
+timer = None
+resend = False
+rwnd = 1
+aimd = Aimd()
 
 #Função que gerar um número aleatório
 def generateRandomNumber(begin_number, number_of_decimals):
     random_int = random.randrange(begin_number, ((10**number_of_decimals) -1))
     return random_int
 
+#Função que inicia o timer
+def newTimer():
+    global timer
+    timer = Timer(10, timeout)
+
+#Função que reseta o timer
+def resetTimer():
+    global timer
+    if timer != None: 
+        timer.cancel()
+    newTimer()
+    timer.start()
+
+#Função executada quando ocorre timeout
+def timeout():
+    global buffer
+    global resend
+
+    resend = True
+
+    aimd.timeout()
+    resendPacket()
+
 #Função para adicionar um cabeçalho IP e enviar o pacote para o roteador
 def sendPacket(address, message):
-    global cwnd
-
-    if len(queue):
-      next_message = message
-      message = queue[0]
-
-      queue.remove(message)
-      queue.append(next_message)
-
-      print(f"Mensagem adicionada na fila: {next_message}")
-      print(f"Mensagens na fila: {queue}")
-
-    #Verifica janela de congestionamento
-    if not cwnd:
-      print(f"Não foi possível enviar mensagem para o servidor. Janela de congestionamento cheia")
-      print(f"Mensagens sem ACK: {buffer}")
-
-      queue.append(message)
-
-      return;
-
     #Obtém endereço da instância
     source_ip = client.getsockname()
     source_ip = source_ip[0] + ":" + str(source_ip[1])
@@ -53,11 +60,9 @@ def sendPacket(address, message):
     IP_header = source_ip + "|" + destination_ip
     packet = IP_header + "|" + message
 
-    #Salva mensagem no buffer e diminui cwnd
-    if not message.__contains__('connect'):
-      message_content = message.split("-")[1]
-      buffer.append(message_content)
-      cwnd = cwnd - 1
+    #Salva mensagem no buffer
+    if message.find('connect') == -1:
+      buffer.append(message)
 
     #Envia o pacote para o roteador
     router = ("127.0.0.1", 8100)
@@ -65,79 +70,80 @@ def sendPacket(address, message):
 
     print(f"Mensagem enviada para o servidor: {message}")
 
+#Função que reenvia os pacotes do buffer caso ocorra timeout
+def resendPacket():
+    global queue_resend
+    global timer
+    global resend
+    global buffer
+    global next_resend    
+
+    print('----------------- Pacotes reenviados ----------------')    
+    #Obtém endereço da instância
+    source_ip = client.getsockname()
+    source_ip = source_ip[0] + ":" + str(source_ip[1])
+
+    #Adiciona o cabeçalho IP no pacote
+    destination_ip = addr[0] + ":" + str(addr[1])
+    IP_header = source_ip + "|" + destination_ip
+
+    #Se tiver pacote no buffer, reenvia
+    for message in buffer:
+        #Coleta a mensagem do buffer e empacota
+        packet = IP_header + "|" + message
+        
+        router = ("127.0.0.1", 8100)
+
+        print(f"Mensagem re-enviada para o servidor: {message}")
+        client.sendto(packet.encode("utf-8"), router)
+    print('-------------------------------------------------')
+
+    resend = False
+
+#Função para lidar com ACKs
+def handleACK(message):
+    global duplicated_acks_count
+    global buffer
+    global resend
+    global rwnd
+    global queue_resend
+    global next_resend
+
+    #Obtém o tipo e conteúdo da mensagem e a janela de recepção
+    splitted_message = message.split("-")
+    message_type = splitted_message[0]
+    message_content = splitted_message[1]
+    rwnd = int(splitted_message[2][4:])
+
+    #Verifica se mensagem não é um ACK para remover do buffer
+    if message_type == "ack":
+        print(f"ACK da mensagem {message_content} recebido")
+        message_content = "message-" + message_content
+
+        #Se a mensagem estiver no buffer, é retirada e o timer é resetado
+        if message_content in buffer:
+            buffer.remove(message_content)
+            aimd.receiveNewAck()
+            resetTimer()
+        else:
+            duplicated_acks_count = (message_content, duplicated_acks_count[1] + 1)
+            #Se receber 3 acks duplicados reenvia os pacotes
+            if duplicated_acks_count[1] == 3:
+                duplicated_acks_count = ("", 0)
+                aimd.receiveThreeDuplicatedAck()
+                resend = True
+                resend_packet_thread = Thread(None, resendPacket)
+                resend_packet_thread.start()
+
 #Função que decodifica o pacote do roteador
 def receivePacket():
-    global cwnd
-    global duplicated_acks_count
-    global queue
-    global buffer
-
     #Recebe a mensagem do cliente
     packet, _ = client.recvfrom(1024)
 
     #Converte a mensagem recebida
     message = packet.decode("utf-8").split("|")
     message_content = message[2]
-
-    #Trata recebimento de mensagens que não de conexão
-    if not message.__contains__('connected'):
-      splited_message = message[2].split("-")
-
-      message_type = splited_message[0]
-      message_content = splited_message[1]
-
-      #Verifica se mensagem não é um ACK para remover do buffer e aumentar cwnd
-      if message_type == "ack":
-          print(f"ACK da mensagem {message_content} recebido")
-          #Verifica se tem ack duplicado
-          if message_content in buffer:
-            buffer.remove(message_content)
-          else:
-            duplicated_acks_count = (message_content, duplicated_acks_count[1] + 1)
-            if duplicated_acks_count[1] == 3:
-                duplicated_acks_count = ("", 0)
-                 #Obtém endereço da instância
-                source_ip = client.getsockname()
-                source_ip = source_ip[0] + ":" + str(source_ip[1])
-
-                #Adiciona o cabeçalho IP no pacote
-                destination_ip = addr[0] + ":" + str(addr[1])
-                IP_header = source_ip + "|" + destination_ip
-
-                m = 0
-
-                #Envia metade das mensagens do buffer novamente
-                while m <= int(len(buffer)/2):
-                    #Coleta a mensagem do buffer
-                    temporary_message = "message-" + buffer[m]
-                    packet = IP_header + "|" + temporary_message
-
-                    #Envia para o servidor
-                    router = ("127.0.0.1", 8100)
-                    client.sendto(packet.encode("utf-8"), router)
-                    print(f"Enviando pacote: {temporary_message}")
-
-                    #Ouve o próximo ACK
-                    packet, _ = client.recvfrom(1024)
-                    packet = (packet.decode("utf-8")).split("-")
-                    print(f"ACK da mensagem: {packet[1]} recebido")
-
-                    #Caso ela tenha sido enviada em ordem, é retirada do buffer
-                    if packet[1] == buffer[m]:
-                        buffer.remove(buffer[m])
-                        m -= 1
-                    time.sleep(3)
-                    m += 1
-
-
-          cwnd = cwnd + 1
-
-
-          if len(queue):
-            next_message = queue[0]
-            queue.remove(next_message)
-            sendPacket(addr, next_message)
-
+    
     # Obtém o endereço de origem
     ip_source = message[0].split(":")
     address = (ip_source[0], ip_source[1])
@@ -187,7 +193,7 @@ if __name__ == "__main__":
     msg_received_string, address = receivePacket()
 
     # Verifica resposta de conexão enviada pelo servidor
-    if msg_received_string == "connected":
+    if msg_received_string.find('connected') != -1:
         print("Conexao estabelecida com o servidor")
         connectedWithServer = True
     else:
@@ -198,34 +204,41 @@ if __name__ == "__main__":
 
     while True:
         #Reseta variáveis
-        msg_to_answer = ""
         msg_received_string = ""
+        
+        print(f"Mensagens sem ACK: {buffer}")
 
-        #Gera número aleatório de até 10 casas
-        random_int_to_send = generateRandomNumber(
-            begin_number = 1,
-            number_of_decimals = random.randrange(1, 10)
-        )
+        if len(buffer) == 0 and resend == False:
+            print('----------------- Pacotes enviados ----------------')
+            print('cwnd', aimd.cwnd, 'rwnd', rwnd)
+                
+            while len(buffer) < min(aimd.cwnd, rwnd):
+                #Gera número aleatório de até 10 casas
+                random_int_to_send = generateRandomNumber(
+                    begin_number = 1,
+                    number_of_decimals = random.randrange(1, 10)
+                )
 
-        #Converte o número para string e envia com o tipo message
-        msg_to_send = "message-" + str(random_int_to_send) + "?" + str(order)
-
-        #Envia a mensagem para o servidor
-        sendPacket(addr, msg_to_send)
-
-        order = order + 1
+                #Converte o número para string e envia com o tipo message
+                msg_to_send = "message-" + str(random_int_to_send) + "?" + str(order)
+                sendPacket(addr, msg_to_send)
+                resetTimer()
+                order = order + 1
+            print('-------------------------------------------------')
 
         #Recebe a mensagem do servidor
         msg_received_string, address = receivePacket()
 
+        handleACK(msg_received_string)
+
         print(f"Mensagem recebida do servidor: {msg_received_string}")
 
         #Aguarda período de tempo de acordo com a janela de recepção
-        if(msg_received_string.__contains__("Janela de Recepção: 0")):
+        if rwnd == 0:
             for i in range(10):
                 print(str(10-i) + "s")
                 time.sleep(1)
-        else:
+        elif len(buffer) == 0:
             for i in range(3):
                 print(str(3-i) + "s")
                 time.sleep(1)
