@@ -1,10 +1,8 @@
 #UDP Server
 import socket
-import random
-import string
 
 LIMIT = 2
-BUFFER_SIZE = 10
+BUFFER_SIZE = 32
 connections = []
 server = None
 buffer = []
@@ -169,8 +167,12 @@ if __name__ == "__main__":
             print(f"LAST MESSAGE ORDER: {last_message_order}, MESSAGE ORDER: {message_order}")
 
             #Se a ordem estiver errada, descarta o pacote e envia ACK do pacote anterior
-            if message_order != last_message_order + 1:
-                sendAck(last_message, address)
+            if message_order != last_message_order + 1 and message_order > last_message_order:
+                sendAck(last_message[1].split('-'), address)
+                continue
+            #Caso uma mensagem antiga apareça, só envia o ack
+            elif message_order <= last_message_order:
+                sendAck(message, address)
                 continue
 
         #Verifica tipo da mensagem para o tratamento adequado
@@ -181,6 +183,6 @@ if __name__ == "__main__":
         elif message_type == "message":
             sendAck(message, address)
             bufferRemove(getLastPacketFromAddressInBuffer(address))
-            bufferAdd("".join(message), address)
+            bufferAdd("-".join(message), address)
         else:
             print("Tipo de mensagem não suportado.")
