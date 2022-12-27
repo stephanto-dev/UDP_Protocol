@@ -1,5 +1,5 @@
 class Aimd:
-  ssthresh = 32
+  ssthresh = 64
   cwnd = 1
 
   def receiveNewAck(self):

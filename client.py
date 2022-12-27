@@ -21,6 +21,11 @@ resend = False
 rwnd = 1
 aimd = Aimd()
 
+buffer_rtt = {}
+estimated_rtt = 1
+dev_rtt = 1
+timeout_interval = 5
+
 #Função que gerar um número aleatório
 def generateRandomNumber(begin_number, number_of_decimals):
     random_int = random.randrange(begin_number, ((10**number_of_decimals) -1))
@@ -29,7 +34,7 @@ def generateRandomNumber(begin_number, number_of_decimals):
 #Função que inicia o timer
 def newTimer():
     global timer
-    timer = Timer(10, timeout)
+    timer = Timer(timeout_interval, timeout)
 
 #Função que reseta o timer
 def resetTimer():
@@ -49,6 +54,33 @@ def timeout():
     aimd.timeout()
     resendPacket()
 
+#Função que calcula o intervalo de timeout
+def calculateTimeoutInterval():
+    global estimated_rtt
+    global dev_rtt
+    global timeout_interval
+    global buffer_rtt
+
+    sum_rtt = 0
+    qtd_rtt = 0
+
+    theta = 0.125
+    beta = 0.25
+
+    for message in buffer_rtt:
+        if "stop" in buffer_rtt[message]:
+            rtt = buffer_rtt[message]["stop"] - buffer_rtt[message]["start"]
+            sum_rtt += rtt
+            qtd_rtt += 1  
+    
+    if qtd_rtt > 0:
+        sample_rtt = sum_rtt / qtd_rtt
+        estimated_rtt = (1 - theta) * estimated_rtt + theta * sample_rtt
+        dev_rtt = (1 - beta) * dev_rtt + beta * abs(sample_rtt - estimated_rtt)
+        timeout_interval = estimated_rtt + 4 * dev_rtt + 3
+
+    buffer_rtt = {}
+
 #Função para adicionar um cabeçalho IP e enviar o pacote para o roteador
 def sendPacket(address, message):
     #Obtém endereço da instância
@@ -63,6 +95,9 @@ def sendPacket(address, message):
     #Salva mensagem no buffer
     if message.find('connect') == -1:
       buffer.append(message)
+      buffer_rtt[message] = {
+        "start": time.perf_counter()
+      }
 
     #Envia o pacote para o roteador
     router = ("127.0.0.1", 8100)
@@ -72,33 +107,35 @@ def sendPacket(address, message):
 
 #Função que reenvia os pacotes do buffer caso ocorra timeout
 def resendPacket():
+    global rwnd
     global queue_resend
     global timer
     global resend
     global buffer
     global next_resend    
 
-    print('----------------- Pacotes reenviados ----------------')    
-    #Obtém endereço da instância
-    source_ip = client.getsockname()
-    source_ip = source_ip[0] + ":" + str(source_ip[1])
+    if rwnd > 0:
+        print('----------------- Pacotes reenviados ----------------')    
+        #Obtém endereço da instância
+        source_ip = client.getsockname()
+        source_ip = source_ip[0] + ":" + str(source_ip[1])
 
-    #Adiciona o cabeçalho IP no pacote
-    destination_ip = addr[0] + ":" + str(addr[1])
-    IP_header = source_ip + "|" + destination_ip
+        #Adiciona o cabeçalho IP no pacote
+        destination_ip = addr[0] + ":" + str(addr[1])
+        IP_header = source_ip + "|" + destination_ip
 
-    #Se tiver pacote no buffer, reenvia
-    for message in buffer:
-        #Coleta a mensagem do buffer e empacota
-        packet = IP_header + "|" + message
-        
-        router = ("127.0.0.1", 8100)
+        #Se tiver pacote no buffer, reenvia
+        for message in buffer:
+            #Coleta a mensagem do buffer e empacota
+            packet = IP_header + "|" + message
+            
+            router = ("127.0.0.1", 8100)
 
-        print(f"Mensagem re-enviada para o servidor: {message}")
-        client.sendto(packet.encode("utf-8"), router)
-    print('-------------------------------------------------')
+            print(f"Mensagem re-enviada para o servidor: {message}")
+            client.sendto(packet.encode("utf-8"), router)
+        print('-------------------------------------------------')
 
-    resend = False
+        resend = False
 
 #Função para lidar com ACKs
 def handleACK(message):
@@ -123,6 +160,10 @@ def handleACK(message):
         #Se a mensagem estiver no buffer, é retirada e o timer é resetado
         if message_content in buffer:
             buffer.remove(message_content)
+            buffer_rtt[message_content] = {
+                "start": buffer_rtt[message_content]["start"],
+                "stop": time.perf_counter()
+            }
             aimd.receiveNewAck()
             resetTimer()
         else:
@@ -168,10 +209,17 @@ def exitHandler():
 #Registro da função executada antes do programa ser finalizado
 atexit.register(exitHandler)
 
+# def close():
+#     exitHandler()
+#     sys.exit()
+
 if __name__ == "__main__":
     host = "127.0.0.1"
     port = 4455
     addr = (host, port)
+
+    # fechar = Timer(60, close)
+    # fechar.start()
 
     #AF_INET = indica que é um protocolo de endereço ip
     #SOCK_DGRAM = indica que é um protocolo da camada de transporte UDP
@@ -209,6 +257,8 @@ if __name__ == "__main__":
         print(f"Mensagens sem ACK: {buffer}")
 
         if len(buffer) == 0 and resend == False:
+            if len(buffer_rtt) > 64:
+                calculateTimeoutInterval()
             print('----------------- Pacotes enviados ----------------')
             print('cwnd', aimd.cwnd, 'rwnd', rwnd)
                 
