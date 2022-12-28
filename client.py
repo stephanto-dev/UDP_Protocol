@@ -51,7 +51,6 @@ def timeout():
     global timeout_interval
 
     resend = True
-    timeout_interval += 1
 
     aimd.timeout()
     resendPacket()
@@ -69,18 +68,22 @@ def calculateTimeoutInterval():
     theta = 0.125
     beta = 0.25
 
+    #Obtém a soma dos RTT
     for message in buffer_rtt:
         if "stop" in buffer_rtt[message]:
             rtt = buffer_rtt[message]["stop"] - buffer_rtt[message]["start"]
             sum_rtt += rtt
             qtd_rtt += 1  
     
+    #Realiza a média dos RTT e faz a estimação
     if qtd_rtt > 0:
         sample_rtt = sum_rtt / qtd_rtt
         estimated_rtt = (1 - theta) * estimated_rtt + theta * sample_rtt
         dev_rtt = (1 - beta) * dev_rtt + beta * abs(sample_rtt - estimated_rtt)
+        # +3 por conta do mini intervalo entre o recebimento dos pacotes
         timeout_interval = estimated_rtt + 4 * dev_rtt + 3
 
+    #Reseta o buffer
     buffer_rtt = {}
 
 #Função para adicionar um cabeçalho IP e enviar o pacote para o roteador
@@ -255,7 +258,10 @@ if __name__ == "__main__":
         
         print(f"Mensagens sem ACK: {buffer}")
 
+        #Se não tiver mensagens no buffer e não estiver re-enviando mensagens,
+        #Então envia vários pacotes de uma vez limitado pelo mínimo entre cwnd e rwnd
         if len(buffer) == 0 and resend == False:
+            #Recalcula o intervalo de timeout a cada aproximadamente 64 pacotes
             if len(buffer_rtt) > 64:
                 calculateTimeoutInterval()
             print('----------------- Pacotes enviados ----------------')

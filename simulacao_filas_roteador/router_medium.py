@@ -61,8 +61,9 @@ if __name__ == "__main__":
   router = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
   router.bind(("127.0.0.1", 8100))
 
-  fechar = Timer(630, close)
-  fechar.start()
+  #Interrompe o programa em 10 minutos e 30 segundos
+  stop_program = Timer(630, close)
+  stop_program.start()
 
   #Inicializa uma thread para receber pacotes
   receive_packet_thread = Thread(None, receivePacket)
