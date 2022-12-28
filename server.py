@@ -2,7 +2,7 @@
 import socket
 
 LIMIT = 2
-BUFFER_SIZE = 32
+BUFFER_SIZE = 1000
 connections = []
 server = None
 buffer = []

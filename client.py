@@ -48,8 +48,10 @@ def resetTimer():
 def timeout():
     global buffer
     global resend
+    global timeout_interval
 
     resend = True
+    timeout_interval += 1
 
     aimd.timeout()
     resendPacket()
@@ -167,14 +169,18 @@ def handleACK(message):
             aimd.receiveNewAck()
             resetTimer()
         else:
-            duplicated_acks_count = (message_content, duplicated_acks_count[1] + 1)
+            if duplicated_acks_count[0] == message_content:
+                duplicated_acks_count = (message_content, duplicated_acks_count[1] + 1)
+            else:
+                duplicated_acks_count = (message_content, 1)
             #Se receber 3 acks duplicados reenvia os pacotes
             if duplicated_acks_count[1] == 3:
                 duplicated_acks_count = ("", 0)
                 aimd.receiveThreeDuplicatedAck()
+                if resend == False:
+                    resend_packet_thread = Thread(None, resendPacket)
+                    resend_packet_thread.start()
                 resend = True
-                resend_packet_thread = Thread(None, resendPacket)
-                resend_packet_thread.start()
 
 #Função que decodifica o pacote do roteador
 def receivePacket():
@@ -209,17 +215,10 @@ def exitHandler():
 #Registro da função executada antes do programa ser finalizado
 atexit.register(exitHandler)
 
-# def close():
-#     exitHandler()
-#     sys.exit()
-
 if __name__ == "__main__":
     host = "127.0.0.1"
     port = 4455
     addr = (host, port)
-
-    # fechar = Timer(60, close)
-    # fechar.start()
 
     #AF_INET = indica que é um protocolo de endereço ip
     #SOCK_DGRAM = indica que é um protocolo da camada de transporte UDP

@@ -1,7 +1,7 @@
 import socket
 from threading import Thread
 
-QUEUE_SIZE = 10
+QUEUE_SIZE = 1000
 queue = []
 
 router = None

@@ -138,7 +138,6 @@ def resendPacket():
         print('-------------------------------------------------')
 
         resend = False
-        resetTimer()
 
 #Função para lidar com ACKs
 def handleACK(message):
