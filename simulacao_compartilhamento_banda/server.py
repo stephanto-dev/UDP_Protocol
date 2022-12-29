@@ -1,7 +1,7 @@
 #UDP Server
 import socket
 
-LIMIT = 2
+LIMIT = 3
 BUFFER_SIZE = 1000
 connections = []
 server = None
@@ -40,7 +40,10 @@ def getLastPacketFromAddressInBuffer(address):
     global buffer
 
     packets = [i for i in buffer if i[0] == address]
-    return packets[len(packets) - 1]
+    if len(packets) == 0:
+        return None
+    else:
+        return packets[len(packets) - 1]
 
 #Função para adicionar um cabeçalho IP e enviar o pacote para o roteador
 def sendPacket(address, message):
@@ -161,6 +164,9 @@ if __name__ == "__main__":
             message_order = int(message_order)
 
             last_message = getLastPacketFromAddressInBuffer(address)
+            if last_message == None:
+                sendAck(message, address)
+                continue
             last_message_order = (last_message[1].split("?"))[1]
             last_message_order = int(last_message_order)
 

@@ -1,8 +1,10 @@
 import socket
-from threading import Thread
+import sys
+from threading import Thread, Timer
 
-QUEUE_SIZE = 1000
+QUEUE_SIZE = 64
 queue = []
+missed_packets = []
 
 router = None
 
@@ -11,6 +13,8 @@ def queueAdd(packet):
   global queue
   if len(queue) <= QUEUE_SIZE:
     queue.append(packet)
+  else:
+    missed_packets.append(packet)
 
 #Função que remove o primeiro pacote na fila
 def queueRemove():
@@ -35,6 +39,12 @@ def handlePacket():
   print("Pacote repassado:", packet)
   queueRemove()
 
+#Função que fecha o programa
+def close():
+  print("Pacotes perdidos:", missed_packets)
+  print("Quantidade de pacotes perdidos:", len(missed_packets))
+  sys.exit()
+
 #Função que fica só lendo pacotes e adicionando na fila
 def receivePacket():
   while True:
@@ -50,6 +60,10 @@ def receivePacket():
 if __name__ == "__main__":
   router = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
   router.bind(("127.0.0.1", 8100))
+
+  #Interrompe o programa em 10 minutos e 30 segundos
+  stop_program = Timer(630, close)
+  stop_program.start()
 
   #Inicializa uma thread para receber pacotes
   receive_packet_thread = Thread(None, receivePacket)

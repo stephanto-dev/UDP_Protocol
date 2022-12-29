@@ -26,6 +26,9 @@ estimated_rtt = 1
 dev_rtt = 1
 timeout_interval = 5
 
+qtd_timeouts = 0
+qtd_3_duplicated_acks = 0
+
 #Função que gerar um número aleatório
 def generateRandomNumber(begin_number, number_of_decimals):
     random_int = random.randrange(begin_number, ((10**number_of_decimals) -1))
@@ -49,8 +52,11 @@ def timeout():
     global buffer
     global resend
     global timeout_interval
+    global qtd_timeouts
 
     resend = True
+    qtd_timeouts += 1
+    print('timeout')
 
     aimd.timeout()
     resendPacket()
@@ -80,7 +86,6 @@ def calculateTimeoutInterval():
         sample_rtt = sum_rtt / qtd_rtt
         estimated_rtt = (1 - theta) * estimated_rtt + theta * sample_rtt
         dev_rtt = (1 - beta) * dev_rtt + beta * abs(sample_rtt - estimated_rtt)
-        # +3 por conta do mini intervalo entre o recebimento dos pacotes
         timeout_interval = estimated_rtt + 4 * dev_rtt + 3
 
     #Reseta o buffer
@@ -108,16 +113,14 @@ def sendPacket(address, message):
     router = ("127.0.0.1", 8100)
     client.sendto(packet.encode("utf-8"), router)
 
-    print(f"Mensagem enviada para o servidor: {message}")
+    # print(f"Mensagem enviada para o servidor: {message}")
 
 #Função que reenvia os pacotes do buffer caso ocorra timeout
 def resendPacket():
     global rwnd
-    global queue_resend
     global timer
-    global resend
     global buffer
-    global next_resend    
+    global resend    
 
     if rwnd > 0:
         print('----------------- Pacotes reenviados ----------------')    
@@ -141,6 +144,7 @@ def resendPacket():
         print('-------------------------------------------------')
 
         resend = False
+        # resetTimer()
 
 #Função para lidar com ACKs
 def handleACK(message):
@@ -148,8 +152,7 @@ def handleACK(message):
     global buffer
     global resend
     global rwnd
-    global queue_resend
-    global next_resend
+    global qtd_3_duplicated_acks
 
     #Obtém o tipo e conteúdo da mensagem e a janela de recepção
     splitted_message = message.split("-")
@@ -178,6 +181,8 @@ def handleACK(message):
                 duplicated_acks_count = (message_content, 1)
             #Se receber 3 acks duplicados reenvia os pacotes
             if duplicated_acks_count[1] == 3:
+                qtd_3_duplicated_acks += 1
+                print('3 acks')
                 duplicated_acks_count = ("", 0)
                 aimd.receiveThreeDuplicatedAck()
                 if resend == False:
@@ -218,10 +223,24 @@ def exitHandler():
 #Registro da função executada antes do programa ser finalizado
 atexit.register(exitHandler)
 
+#Função que desconecta o cliente e fecha o programa
+def close():
+    global qtd_timeouts
+    global qtd_3_duplicated_acks
+
+    print("Quantidade de timeouts ocorridos:", qtd_timeouts)
+    print("Quantidade de 3 ACKs duplicados ocorridos:", qtd_3_duplicated_acks)
+    exitHandler()
+    sys.exit()
+
 if __name__ == "__main__":
     host = "127.0.0.1"
     port = 4455
     addr = (host, port)
+
+    #Interrompe o programa em 10 minutos
+    stop_program = Timer(600, close)
+    stop_program.start()
 
     #AF_INET = indica que é um protocolo de endereço ip
     #SOCK_DGRAM = indica que é um protocolo da camada de transporte UDP
@@ -256,7 +275,7 @@ if __name__ == "__main__":
         #Reseta variáveis
         msg_received_string = ""
         
-        print(f"Mensagens sem ACK: {buffer}")
+        # print(f"Mensagens sem ACK: {buffer}")
 
         #Se não tiver mensagens no buffer e não estiver re-enviando mensagens,
         #Então envia vários pacotes de uma vez limitado pelo mínimo entre cwnd e rwnd
@@ -286,14 +305,14 @@ if __name__ == "__main__":
 
         handleACK(msg_received_string)
 
-        print(f"Mensagem recebida do servidor: {msg_received_string}")
+        # print(f"Mensagem recebida do servidor: {msg_received_string}")
 
         #Aguarda período de tempo de acordo com a janela de recepção
-        if rwnd == 0:
-            for i in range(10):
-                print(str(10-i) + "s")
-                time.sleep(1)
-        elif len(buffer) == 0:
-            for i in range(3):
-                print(str(3-i) + "s")
-                time.sleep(1)
+        # if rwnd == 0:
+        #     for i in range(10):
+        #         print(str(10-i) + "s")
+        #         time.sleep(1)
+        # elif len(buffer) == 0:
+        #     for i in range(3):
+        #         print(str(3-i) + "s")
+        #         time.sleep(1)

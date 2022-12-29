@@ -80,8 +80,7 @@ def calculateTimeoutInterval():
         sample_rtt = sum_rtt / qtd_rtt
         estimated_rtt = (1 - theta) * estimated_rtt + theta * sample_rtt
         dev_rtt = (1 - beta) * dev_rtt + beta * abs(sample_rtt - estimated_rtt)
-        # +3 por conta do mini intervalo entre o recebimento dos pacotes
-        timeout_interval = estimated_rtt + 4 * dev_rtt + 3
+        timeout_interval = estimated_rtt + 4 * dev_rtt
 
     #Reseta o buffer
     buffer_rtt = {}
@@ -150,6 +149,7 @@ def handleACK(message):
     global rwnd
     global queue_resend
     global next_resend
+    global timeout_interval
 
     #Obtém o tipo e conteúdo da mensagem e a janela de recepção
     splitted_message = message.split("-")
@@ -218,10 +218,19 @@ def exitHandler():
 #Registro da função executada antes do programa ser finalizado
 atexit.register(exitHandler)
 
+#Função que desconecta o cliente e fecha o programa
+def close():
+    exitHandler()
+    sys.exit()
+
 if __name__ == "__main__":
     host = "127.0.0.1"
     port = 4455
     addr = (host, port)
+
+    #Interrompe o programa em 10 minutos
+    stop_program = Timer(600, close)
+    stop_program.start()
 
     #AF_INET = indica que é um protocolo de endereço ip
     #SOCK_DGRAM = indica que é um protocolo da camada de transporte UDP
@@ -289,11 +298,11 @@ if __name__ == "__main__":
         print(f"Mensagem recebida do servidor: {msg_received_string}")
 
         #Aguarda período de tempo de acordo com a janela de recepção
-        if rwnd == 0:
-            for i in range(10):
-                print(str(10-i) + "s")
-                time.sleep(1)
-        elif len(buffer) == 0:
-            for i in range(3):
-                print(str(3-i) + "s")
-                time.sleep(1)
+        # if rwnd == 0:
+        #     for i in range(10):
+        #         print(str(10-i) + "s")
+        #         time.sleep(1)
+        # elif len(buffer) == 0:
+        #     for i in range(3):
+        #         print(str(3-i) + "s")
+        #         time.sleep(1)
