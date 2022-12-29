@@ -1,6 +1,7 @@
 import socket
+from threading import Thread
 
-QUEUE_SIZE = 10
+QUEUE_SIZE = 1000
 queue = []
 
 router = None
@@ -10,7 +11,6 @@ order = 0
 def losePacket(packet):
   if order == 11:
     return True
-
 
 #Função que adiciona um pacote na fila
 def queueAdd(packet):
@@ -25,26 +25,26 @@ def queueRemove():
 
 #Função que desempacota o primeiro pacote da fila e envia para o endereço de destino
 def handlePacket():
-  message = queue[0]
-  print("Pacote recebido:", message)
+  packet = queue[0]
 
   # Desempacota o pacote
-  message = message.split("|")
+  message = packet.split("|")
 
   # Obtém o endereço de destino
   ip_destination = message[1].split(":")
   address = (ip_destination[0], int(ip_destination[1]))
 
   # Envia o pacote para o endereço correto
-  router.sendto(packet, address)
+  router.sendto(packet.encode("utf-8"), address)
 
   # Remove o pacote da fila
+  print("Pacote repassado:", packet)
   queueRemove()
 
-if __name__ == "__main__":
-  router = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-  router.bind(("127.0.0.1", 8100))
-
+#Função que fica só lendo pacotes e adicionando na fila
+def receivePacket():
+  global order
+  
   while True:
     print("Aguardando pacote...")
     # Recebe o pacote e decodifica
@@ -58,9 +58,20 @@ if __name__ == "__main__":
       continue
     
     # Adiciona o pacote na fila e lê o pacote
+    print("Pacote recebido:", message)
     queueAdd(message)
-    handlePacket()
 
-    
-    
+if __name__ == "__main__":
+  router = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+  router.bind(("127.0.0.1", 8100))
+
+  #Inicializa uma thread para receber pacotes
+  receive_packet_thread = Thread(None, receivePacket)
+  receive_packet_thread.start()
+
+  #Quando algum pacote chegar na fila será repassado
+  while True:
+    if len(queue) > 0:
+      handlePacket()
+  
     
